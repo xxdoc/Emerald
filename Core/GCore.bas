@@ -10,6 +10,12 @@ Attribute VB_Name = "GCore"
         x As Single
         y As Single
     End Type
+    Public Enum PlayStateMark
+        musStopped = 0
+        musPlaying = 1
+        musStalled = 2
+        musPaused = 3
+    End Enum
     Public Enum imgIndex
         imgGetWidth = 0
         imgGetHeight = 1
@@ -55,11 +61,12 @@ Attribute VB_Name = "GCore"
         Hwnd As Long
         ImgHwnd As Long
         Imgs(3) As Long
-        name As String
+        Name As String
         Folder As String
         w As Long
         h As Long
         copyed As Boolean
+        CrashIndex As Long
     End Type
     Public Type AssetsTree
         files() As GMem
@@ -73,16 +80,31 @@ Attribute VB_Name = "GCore"
         DirVertical = 2
         DirHorizontalVertical = 3
     End Enum
+    Public Type GraphicsBound
+        x As Long
+        y As Long
+        Width As Long
+        Height As Long
+        WSc As Single
+        HSc As Single
+        CrashIndex As Long
+        Shape As Long
+        Strings As String
+    End Type
+    Public Type ColorCollection
+        IsAlpha() As Boolean
+    End Type
+    Public ColorLists() As ColorCollection
     Public ECore As GMan, EF As GFont, EAni As Object, ESave As GSaving, EMusic As GMusicList
     Public GHwnd As Long, GDC As Long, GW As Long, GH As Long
-    Public Mouse As MState, DrawF As RECT
+    Public Mouse As MState, DrawF As GraphicsBound
     Public FPS As Long, FPSt As Long, tFPS As Long, FPSct As Long, FPSctt As Long
     Public SysPage As GSysPage
     Public PreLoadCount As Long, LoadedCount As Long, ReLoadCount As Long
     Public FPSWarn As Long
     Public EmeraldInstalled As Boolean
     Public BassInstalled As Boolean
-    Public Const Version As Long = 19062304
+    Public Const Version As Long = 19063006 '
     Public TextHandle As Long, WaitChr As String
     Dim AssetsTrees() As AssetsTree
     Dim LastKeyUpRet As Boolean
@@ -101,6 +123,11 @@ Attribute VB_Name = "GCore"
         strBuf = Left(strBuf, InStr(strBuf, Chr(0)))
         ReadINI = strBuf
     End Function
+    Public Sub OutPutDebug(Str As String)
+        Open App.path & "\debug.txt" For Append As #1
+        Print #1, Now & "    " & Str
+        Close #1
+    End Sub
 '================================================================================
 '   Init
     Public Sub SaveSettings(data As GSaving)
@@ -132,7 +159,8 @@ Attribute VB_Name = "GCore"
         Set data = Nothing
     End Sub
     Public Sub StartEmerald(Hwnd As Long, w As Long, h As Long)
-    
+        ReDim ColorLists(0)
+            
         Dim strComputer, objWMIService, colItems, objItem, strOSversion As String
         strComputer = "."
         Set objWMIService = GetObject("winmgmts:\\" & strComputer & "\root\cimv2")
@@ -200,10 +228,9 @@ Attribute VB_Name = "GCore"
         TerminateGDIPlus
         If BassInstalled Then BASS_Free
     End Sub
-    Public Sub MakeFont(ByVal name As String)
+    Public Sub MakeFont(ByVal Name As String)
         Set EF = New GFont
-        EF.MakeFont name
-        EmeraldInstalled = True
+        EF.MakeFont Name
     End Sub
 '========================================================
 '   RunTime
@@ -237,7 +264,7 @@ sth:
         
         GetWinNTVersion = Left(strOSversion, 3)
     End Function
-    Public Sub BlurTo(DC As Long, srcDC As Long, buffWin As Form, Optional Radius As Long = 60)
+    Public Sub BlurTo(DC As Long, srcDC As Long, buffWin As Form, Optional radius As Long = 60)
         Dim i As Long, g As Long, e As Long, b As BlurParams, w As Long, h As Long
         '粘贴到缓冲窗口
         buffWin.AutoRedraw = True
@@ -247,7 +274,7 @@ sth:
         GdipCreateBitmapFromHBITMAP buffWin.Image.handle, buffWin.Image.hpal, i
         
         '模糊操作
-        GdipCreateEffect2 GdipEffectType.Blur, e: b.Radius = Radius: GdipSetEffectParameters e, b, LenB(b)
+        GdipCreateEffect2 GdipEffectType.Blur, e: b.radius = radius: GdipSetEffectParameters e, b, LenB(b)
         GdipGetImageWidth i, w: GdipGetImageHeight i, h
         GdipBitmapApplyEffect i, e, NewRectL(0, 0, w, h), 0, 0, 0
         
@@ -257,12 +284,12 @@ sth:
         GdipDisposeImage i: GdipDeleteGraphics g: GdipDeleteEffect e '垃圾处理
         buffWin.AutoRedraw = False
     End Sub
-    Public Sub BlurImg(img As Long, Radius As Long)
+    Public Sub BlurImg(img As Long, radius As Long)
         Dim b As BlurParams, e As Long, w As Long, h As Long
         
         '模糊操作
 
-        GdipCreateEffect2 GdipEffectType.Blur, e: b.Radius = Radius: GdipSetEffectParameters e, b, LenB(b)
+        GdipCreateEffect2 GdipEffectType.Blur, e: b.radius = radius: GdipSetEffectParameters e, b, LenB(b)
         GdipGetImageWidth img, w: GdipGetImageHeight img, h
         GdipBitmapApplyEffect img, e, NewRectL(0, 0, w, h), 0, 0, 0
         
@@ -335,8 +362,11 @@ sth:
     End Function
     Public Function CheckMouse2() As MButtonState
         'Return Value:0=none,1=in,2=down,3=up
-        If Mouse.x >= DrawF.Left And Mouse.y >= DrawF.top And Mouse.x <= DrawF.Left + DrawF.Right And Mouse.y <= DrawF.top + DrawF.Bottom Then
+        If Mouse.x >= DrawF.x And Mouse.y >= DrawF.y And Mouse.x <= DrawF.x + DrawF.Width And Mouse.y <= DrawF.y + DrawF.Height Then
             CheckMouse2 = Mouse.state + 1
+            If DrawF.CrashIndex <> 0 Then
+                If ColorLists(DrawF.CrashIndex).IsAlpha((Mouse.x - DrawF.x) * DrawF.WSc, (Mouse.y - DrawF.y) * DrawF.HSc) = False Then CheckMouse2 = mMouseOut: Exit Function
+            End If
             If Mouse.state = 2 Then Mouse.state = 0
         End If
     End Function

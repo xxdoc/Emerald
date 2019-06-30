@@ -16,6 +16,7 @@ Attribute VB_Exposed = False
     Public Page As GPage
 '======================================
     Dim HideTime As Long
+    'Dim test As String
 Public Sub DrawSetup()
 
     Page.Clear argb(255 * 0.85, 242, 242, 249) '清空画布
@@ -113,14 +114,26 @@ Public Sub Update()
                 'Page.DrawAnimation "test", 400, 250
                 'Page.DrawAnimation "test", 100, 0
                 
-                Page.DrawImage "404.png", 165, GH / 2, alpha:=1 - pro, pos:=posOnCenter, animation:=1
+                'If Page.ShowEdit(test, 2, 100, 100, 300, 40, argb(255, 0, 0, 0), argb(180, 255, 255, 255), argb(255, 255, 255, 255), argb(255, 210, 210, 210), 64, 0, 28) = 4 Then
+                '    MsgBox "文本框内容：" & test
+                'End If
+                'If Page.ShowEdit(test, 0, 100, 160, 300, 40, argb(255, 0, 0, 0), argb(180, 255, 255, 255), argb(255, 255, 255, 255), argb(255, 210, 210, 210), 0, 0, 28) = 4 Then
+                '    MsgBox "文本框内容：" & test
+                'End If
                 
+                Page.DrawImage "404.png", 165, GH / 2, alpha:=1 - pro, pos:=posOnCenter, animation:=1
+
                 'Page.ShowColorCheckBox Debug_focus, 20, 100, 200, 24, "Debug_Switch", argb(255, 222, 222, 222), argb(255, 0, 176, 240), argb(150, 242, 242, 242), 18
                 
                 Page.Writes "关于", 350 + pro * 22, 170 + pro * 36, Color:=argb(255, 242, 242, 242), size:=18 + pro * 4, animation:=1, style:=FontStyleBold
                 Page.Writes "制作： Error 404（QQ 1361778219）" & vbCrLf & "邮箱： ris_vb@126.com", 350 - pro * 110, 220 + pro * 40, Color:=argb(150, 242, 242, 242), size:=18, animation:=2
                 Page.Writes "版本： " & Version, 350 - pro * 50, 270 + pro * 40, Color:=argb(150 - pro * 150, 242, 242, 242), size:=18, animation:=2
                 Page.Writes "感谢Inter.net群，Redstone群和南笙的支持。", 350 - pro * 110, 340 + pro * 180, Color:=argb(150 - pro * 60, 242, 242, 242), size:=18 - pro * 2, animation:=2
+                Page.Writes "Emerald 开发文档", 350 - pro * 30, 370 - pro * 40, w:=200, h:=25, Color:=argb(255, 255, 255, 255), size:=18, animation:=2, style:=FontStyleBold
+                If CheckMouse2 = mMouseUp Then
+                    ShellExecuteA 0, "open", "https://github.com/buger404/Emerald/wiki", "", "", SW_SHOW
+                End If
+                
                 If NewVersion = 0 Then
                     NewVersion = 1
                     Call CheckOnLineUpdate
@@ -134,8 +147,8 @@ Public Sub Update()
                         If HideTime = 0 Then HideTime = GetTickCount
                         Page.Paint 1, 30, GH - 30 - 24, 24, 24, argb(255, 255, 206, 69)
                         Page.Writes "有更新可用（" & NewVersion & "），点击此处下载。", 80, GH - 30 - 24, w:=GW, h:=25, Color:=argb(255, 232, 76, 61), size:=18, animation:=2
-                        If CheckMouse2 = mMouseUp Then ShellExecuteA 0, "open", "https://github.com/Red-Error404/Emerald", "", "", SW_SHOW
-                    Case Is = Version
+                        If CheckMouse2 = mMouseUp Then ShellExecuteA 0, "open", "https://github.com/buger404/Emerald", "", "", SW_SHOW
+                    Case Is <= Version
                         If HideTime = 0 Then HideTime = GetTickCount
                         Page.Paint 1, 30, GH - 30 - 24, 24, 24, argb(255 - pro * 255, 95, 229, 221)
                         Page.Writes "已经是最新版本", 80, GH - 30 - 24, Color:=argb(150 - pro * 150, 242, 242, 242), size:=18, animation:=2
@@ -203,11 +216,29 @@ Private Sub Class_Initialize()
     '导入游戏资源
     If PackPos = -1 Then
         Page.Res.NewImages App.path & "\assets"
-        'Page.Res.NewImages App.path & "\assets\test", 0.4
+        Page.Res.NewImages App.path & "\assets\debug"
         '导入动画
         'Page.LoadAnimationsFromDir App.path & "\animation"
-        'Page.CreatePlayAnimation "test", "test", "Default"
+        'Page.CreatePlayAnimation   "test", "test", "Default"
     End If
+    Dim m(4, 4) As Single
+    m(0, 0) = 1: m(0, 1) = 0: m(0, 2) = 0: m(0, 3) = 0
+    m(1, 0) = 0: m(1, 1) = 0: m(1, 2) = 0: m(1, 3) = 0
+    m(2, 0) = 0: m(2, 1) = 0: m(2, 2) = 0: m(2, 3) = 0
+    m(3, 0) = 1: m(3, 1) = 0: m(3, 2) = 0: m(3, 3) = 1
+    
+    'Page.Res.ClipCircle "404.png"
+    '笔记
+    'Page.Res.ApplyBlurEffect 模糊半径，四周阴影
+    'ApplyBrightnessContrastEffect 亮度，对比度
+    'ApplyColorBalanceEffect 红色调，绿色调，蓝色调
+    'ApplyColorCurveEffect 对指定颜色通道应用某个特殊效果
+    'ApplyColorMatrixEffect 反正颜色矩阵就对了
+    'ApplyHueSaturationLightnessEffect 色相，亮度，饱和度
+    'ApplyLevelsEffect 高光，中间色，暗调
+    'ApplySharpenEffect 数量，锐化半径
+    'ApplyTintEffect 程度，色调
+    
     '创建页面
     ECore.Add Page, "WelcomePage"
     

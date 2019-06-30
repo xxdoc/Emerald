@@ -14,17 +14,213 @@ Attribute VB_Exposed = False
 Private Declare Function CLSIDFromString Lib "ole32.dll" (ByVal lpszProgID As Long, pCLSID As clsid) As Long
 Public HotLoad As Boolean
 Public AssetsFolder As String
+Public SearchIndex As Long
 Dim Mems() As GMem
-
+Dim effect As Long, effectw As Long, effecth As Long, effectimg As Long, effectindex As Integer
+Dim DisposeMark As Boolean
 Private Sub Class_Initialize()
     ReDim Mems(0)
+    SearchIndex = 1
 End Sub
-Public Sub Add(mem As Long, kind As Integer, name As String, Optional w, Optional h, Optional Folder As String = "")
+Public Sub ClipCircle(n)
+    Dim index As Integer
+    
+    If TypeName(n) = "String" Then
+        index = GetImage(n)
+    Else
+        index = n
+    End If
+
+    Dim path As Long, bmpGraph As Long, BMP As Long, BMP2 As Long, tempGraph As Long
+    Dim w As Long, h As Long
+    
+    GdipGetImageWidth Mems(index).ImgHwnd, w
+    GdipGetImageHeight Mems(index).ImgHwnd, h
+
+    GdipCreateBitmapFromScan0 w, h, ByVal 0, PixelFormat32bppARGB, ByVal 0, BMP2
+    GdipCreateBitmapFromScan0 w * 2, h * 2, ByVal 0, PixelFormat32bppARGB, ByVal 0, BMP
+
+    GdipGetImageGraphicsContext BMP2, tempGraph
+    GdipGetImageGraphicsContext BMP, bmpGraph
+    GdipSetSmoothingMode tempGraph, SmoothingModeAntiAlias
+    GdipSetSmoothingMode bmpGraph, SmoothingModeAntiAlias
+    
+    GdipCreatePath FillModeWinding, path
+    GdipAddPathEllipseI path, 1, 1, w * 2 - 2, h * 2 - 2
+    GdipSetClipPath bmpGraph, path, CombineModeReplace
+    
+    GdipDrawImageRectI bmpGraph, Mems(index).ImgHwnd, 0, 0, w * 2, h * 2
+    GdipResetClip bmpGraph
+    
+    GdipSetInterpolationMode tempGraph, InterpolationModeHighQualityBilinear
+    
+    GdipDrawImageRectI tempGraph, BMP, 0, 0, w - 1, h - 1
+
+    GdipDeletePath path
+    GdipDeleteGraphics bmpGraph
+    GdipDisposeImage BMP
+    GdipDeleteGraphics tempGraph
+    GdipDisposeImage Mems(index).ImgHwnd
+    
+    Mems(index).ImgHwnd = BMP2
+    
+    Call ReDraw(index)
+End Sub
+Private Sub ApplyEffect(n, kind As GdipEffectType)
+    Dim index As Integer
+    
+    If TypeName(n) = "String" Then
+        index = GetImage(n)
+    Else
+        index = n
+    End If
+    
+    effectimg = Mems(index).ImgHwnd
+    
+    GdipCreateEffect2 kind, effect
+    
+    effectindex = index
+End Sub
+Private Sub ApplyEffectStep2()
+    GdipGetImageWidth effectimg, effectw: GdipGetImageHeight effectimg, effecth
+    GdipBitmapApplyEffect effectimg, effect, NewRectL(0, 0, effectw, effecth), 0, 0, 0
+    
+    GdipDeleteEffect effect '垃圾处理
+    
+    Call ReDraw(effectindex)
+End Sub
+Public Sub ApplyTintEffect(n, amount As Long, hue As Long)
+    Dim e As TintParams
+    e.amount = amount
+    e.hue = hue
+    
+    ApplyEffect n, Tint
+    GdipSetEffectParameters effect, e, LenB(e)
+    ApplyEffectStep2
+End Sub
+Public Sub ApplySharpenEffect(n, amount As Single, radius As Single)
+    Dim e As SharpenParams
+    e.amount = amount
+    e.radius = radius
+
+    ApplyEffect n, Sharpen
+    GdipSetEffectParameters effect, e, LenB(e)
+    ApplyEffectStep2
+End Sub
+Public Sub ApplyBlurEffect(n, radius As Long, edge As Integer)
+    Dim e As BlurParams
+    e.radius = radius
+    e.expandEdge = edge
+
+    ApplyEffect n, Blur
+    GdipSetEffectParameters effect, e, LenB(e)
+    ApplyEffectStep2
+End Sub
+Public Sub ApplyBrightnessContrastEffect(n, brightnessLevel As Long, contrastLevel As Long)
+    Dim e As BrightnessContrastParams
+    e.brightnessLevel = brightnessLevel
+    e.contrastLevel = contrastLevel
+
+    ApplyEffect n, BrightnessContrast
+    GdipSetEffectParameters effect, e, LenB(e)
+    ApplyEffectStep2
+End Sub
+Public Sub ApplyColorBalanceEffect(n, cyanRed As Long, magentaGreen As Long, yellowBlue As Long)
+    Dim e As ColorBalanceParams
+    e.cyanRed = cyanRed
+    e.magentaGreen = magentaGreen
+    e.yellowBlue = YellowGreen
+
+    ApplyEffect n, ColorBalance
+    GdipSetEffectParameters effect, e, LenB(e)
+    ApplyEffectStep2
+End Sub
+Public Sub ApplyColorCurveEffect(n, adjustment As CurveAdjustments, adjustValue As Long, channel As CurveChannel)
+    Dim e As ColorCurveParams
+    e.adjustment = adjustment
+    e.adjustValue = adjustValue
+    e.channel = channel
+
+    ApplyEffect n, ColorCurve
+    GdipSetEffectParameters effect, e, LenB(e)
+    ApplyEffectStep2
+End Sub
+Public Sub ApplyColorMatrixEffect(n, m() As Single)
+    Dim e As ColorMatrix
+    For i = 0 To 4
+        For s = 0 To 4
+            e.m(i, s) = m(i, s)
+        Next
+    Next
+    ApplyEffect n, ColorMatrix
+    GdipSetEffectParameters effect, e, LenB(e)
+    ApplyEffectStep2
+End Sub
+Public Sub ApplyHueSaturationLightnessEffect(n, hueLevel As Long, lightnessLevel As Long, saturationLevel As Long)
+    Dim e As HueSaturationLightnessParams
+    e.hueLevel = hueLevel
+    e.lightnessLevel = lightnessLevel
+    e.saturationLevel = saturationLevel
+
+    ApplyEffect n, HueSaturationLightness
+    GdipSetEffectParameters effect, e, LenB(e)
+    ApplyEffectStep2
+End Sub
+Public Sub ApplyLevelsEffect(n, highlight As Long, midtone As Long, Shadow As Long)
+    Dim e As LevelsParams
+    e.highlight = highlight
+    e.midtone = midtone
+    e.Shadow = Shadow
+
+    ApplyEffect n, Levels
+    GdipSetEffectParameters effect, e, LenB(e)
+    ApplyEffectStep2
+End Sub
+Private Sub ReDraw(i As Integer)
+    If Mems(i).GIF.Count > 0 Then Exit Sub
+    
+    Dim g As Long
+    GdipCreateFromHDC Mems(i).Hwnd, g
+    GdipSetSmoothingMode g, SmoothingModeAntiAlias
+    GdipGraphicsClear g, 0
+    GdipDrawImageRect g, Mems(i).ImgHwnd, 0, 0, Mems(i).w, Mems(i).h
+    GdipDeleteGraphics g
+    
+    For s = 0 To 3
+        GdipCreateFromHDC Mems(i).Imgs(s), g
+        GdipSetSmoothingMode g, SmoothingModeAntiAlias
+        GdipGraphicsClear g, 0
+        GdipDrawImageRect g, Mems(i).ImgHwnd, IIf(s = 1 Or s = 3, Mems(i).w, 0), IIf(s = 2 Or s = 3, Mems(i).h, 0), Mems(i).w * IIf(s = 1 Or s = 3, -1, 1), Mems(i).h * IIf(s = 2 Or s = 3, -1, 1)
+        GdipDeleteGraphics g
+    Next
+    
+    Dim tempCo As Long, tCo(3) As Byte
+    Dim iW As Long, iH As Long
+
+    ReDim Preserve ColorLists(UBound(ColorLists) + 1)
+    ReDim ColorLists(UBound(ColorLists)).IsAlpha(Mems(i).w + 1, Mems(i).h + 1)
+    
+    DC = Mems(i).Imgs(0)
+    GdipGetImageWidth Mems(i).ImgHwnd, iW: GdipGetImageHeight Mems(i).ImgHwnd, iH
+    For x = 0 To Mems(i).w - 1
+        For y = 0 To Mems(i).h - 1
+            '取得像素点颜色
+            GdipBitmapGetPixel Mems(i).ImgHwnd, x / (Mems(i).w - 1) * iW, y / (Mems(i).h - 1) * iH, tempCo
+            CopyMemory tCo(0), tempCo, 4
+            
+            If tCo(3) = 255 Then ColorLists(UBound(ColorLists)).IsAlpha(x, y) = True
+        Next
+        DoEvents
+    Next
+    
+    Mems(i).CrashIndex = UBound(ColorLists)
+End Sub
+Public Sub Add(mem As Long, kind As Integer, Name As String, Optional w, Optional h, Optional Folder As String = "")
     ReDim Preserve Mems(UBound(Mems) + 1)
     With Mems(UBound(Mems))
         .Hwnd = mem
         .kind = kind
-        .name = name
+        .Name = Name
         .Folder = Folder
         If Not IsMissing(w) Then .w = w
         If Not IsMissing(h) Then .h = h
@@ -52,6 +248,7 @@ Public Property Get ImgSize(n, sizeIndex As imgIndex)
     End Select
 End Property
 Public Sub Dispose()
+    If DisposeMark Then Exit Sub
     For i = 1 To UBound(Mems)
         If Not Mems(i).copyed Then
             Select Case Mems(i).kind
@@ -71,6 +268,8 @@ Public Sub Dispose()
             End If
         End If
     Next
+    
+    DisposeMark = True
 End Sub
 Public Property Get ResourceGIFHandle(index As Integer, frame As Integer) As Long
     ResourceGIFHandle = Mems(index).GIF.frames(frame)
@@ -92,10 +291,13 @@ Public Property Get ResourceGIFTime(index As Integer) As Long
     ResourceGIFTime = Mems(index).GIF.time
 End Property
 Public Property Get ResourceName(index As Integer) As Long
-    ResourceName = Mems(index).name
+    ResourceName = Mems(index).Name
 End Property
 Public Property Get ResourceHandle(index As Integer) As Long
     ResourceHandle = Mems(index).Hwnd
+End Property
+Public Property Get ResourceCrashIndex(index As Integer) As Long
+    ResourceCrashIndex = Mems(index).CrashIndex
 End Property
 Public Property Get ResourceHandle2(index As Integer, Direction As ImgDirection) As Long
     ResourceHandle2 = Mems(index).Imgs(Direction)
@@ -103,23 +305,23 @@ End Property
 Public Property Get ResourceImageHandle(index As Integer) As Long
     ResourceImageHandle = Mems(index).ImgHwnd
 End Property
-Public Function GetImage(ByVal name As String) As Integer
-    For i = 1 To UBound(Mems)
+Public Function GetImage(ByVal Name As String) As Integer
+    For i = SearchIndex To UBound(Mems)
         If Mems(i).kind = 0 Then
-            If Mems(i).name = name Then GetImage = i: Exit For
+            If Mems(i).Name = Name Then GetImage = i: Exit For
         End If
     Next
     
     If HotLoad Then
         If GetImage = 0 Then
-            If Dir(AssetsFolder & name) <> "" Then
-                newImage AssetsFolder & name
+            If Dir(AssetsFolder & Name) <> "" Then
+                newImage AssetsFolder & Name
                 GetImage = UBound(Mems)
             End If
         End If
     End If
 End Function
-Public Sub newImage(path As String, Optional arg1, Optional arg2)
+Public Sub newImage(path As String, Optional arg1, Optional arg2, Optional Name As String = "")
     'when arg1 is missing ; i.w = i.w
     'when arg2 is missing but arg1 has content ; i.w = i.w * arg1
     'other ; i.w = arg1
@@ -134,9 +336,10 @@ Public Sub newImage(path As String, Optional arg1, Optional arg2)
     If si = 1 Then w = Round(w * arg1): h = Round(h * arg1)
     If si = 2 Then w = arg1: h = arg2
     
-    Dim gC As clsid, gL As Long, index As Long, temp() As String
+    Dim gC As clsid, gL As Long, index As Long, temp() As String, CrashPath As Long
     CLSIDFromString StrPtr("{6AEDBD6D-3FB5-418A-83A6-7F45229DC872}"), gC
     GdipImageGetFrameCount i, gC, gL
+    
     If gL > 0 Then  '动态GIF支持
         temp = Split(path, "\")
         Add 0, 0, temp(UBound(temp)), w, h, temp(UBound(temp) - 1)
@@ -160,7 +363,7 @@ Public Sub newImage(path As String, Optional arg1, Optional arg2)
     temp = Split(path, "\")
     ReDim Preserve Mems(UBound(Mems) + 1)
     With Mems(UBound(Mems))
-        .name = temp(UBound(temp))
+        .Name = IIf(Name = "", temp(UBound(temp)), Name)
         .Folder = temp(UBound(temp) - 1)
         .w = w
         .h = h
@@ -174,6 +377,27 @@ Public Sub newImage(path As String, Optional arg1, Optional arg2)
         GdipDeleteGraphics g
         Mems(UBound(Mems)).Imgs(s) = DC
     Next
+    
+    Dim tempCo As Long, tCo(3) As Byte
+    Dim iW As Long, iH As Long
+
+    ReDim Preserve ColorLists(UBound(ColorLists) + 1)
+    ReDim ColorLists(UBound(ColorLists)).IsAlpha(w + 1, h + 1)
+    
+    DC = Mems(UBound(Mems)).Imgs(0)
+    GdipGetImageWidth i, iW: GdipGetImageHeight i, iH
+    For x = 0 To w - 1
+        For y = 0 To h - 1
+            '取得像素点颜色
+            GdipBitmapGetPixel i, x / (w - 1) * iW, y / (h - 1) * iH, tempCo
+            CopyMemory tCo(0), tempCo, 4
+
+            If tCo(3) = 255 Then ColorLists(UBound(ColorLists)).IsAlpha(x, y) = True
+        Next
+        DoEvents
+    Next
+    
+    Mems(UBound(Mems)).CrashIndex = UBound(ColorLists)
 End Sub
 Public Sub NewImages(path As String, Optional arg1, Optional arg2)
     AssetsFolder = path

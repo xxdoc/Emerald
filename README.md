@@ -1,4 +1,4 @@
-﻿# Emerald
+# Emerald
 面向游戏的轻量级绘图框架
 
 # 支持
@@ -14,4 +14,24 @@ Visual Basic 6.0
 √ 动画系统  
 
 # 文档
-[Emerald文档](https://buger404.github.io/emerald/menu.html)
+ [Emerald Wiki](https://github.com/buger404/Emerald/wiki)
+ 
+# English Version
+  
+# Emerald
+A game framework for Visual Basic 6.0.
+
+# Support
+Visual Basic 6.0  
+
+# Functions
+√ Basic Graphics Drawing  
+√ Immediate Controls  
+√ Safe Game Save  
+√ Game Resource Manager  
+√ Game Page Manager  
+√ Music Player based on Bass  
+√ Animation System  
+
+# Documentation
+ [Emerald Wiki](https://github.com/buger404/Emerald/wiki)

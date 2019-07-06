@@ -13,13 +13,15 @@ Attribute VB_PredeclaredId = False
 Attribute VB_Exposed = False
 Private Declare Function CLSIDFromString Lib "ole32.dll" (ByVal lpszProgID As Long, pCLSID As clsid) As Long
 Public HotLoad As Boolean
-Public AssetsFolder As String
+Dim AssetsFolder() As String, FolderParam1() As Variant, FolderParam2() As Variant
 Public SearchIndex As Long
+Public NoLoadCrash As Boolean
 Dim Mems() As GMem
-Dim effect As Long, effectw As Long, effecth As Long, effectimg As Long, effectindex As Integer
+Dim Effect As Long, effectw As Long, effecth As Long, effectimg As Long, effectindex As Integer
 Dim DisposeMark As Boolean
 Private Sub Class_Initialize()
     ReDim Mems(0)
+    ReDim AssetsFolder(0): ReDim FolderParam1(0): ReDim FolderParam2(0)
     SearchIndex = 1
 End Sub
 Public Sub ClipCircle(n)
@@ -77,15 +79,15 @@ Private Sub ApplyEffect(n, kind As GdipEffectType)
     
     effectimg = Mems(index).ImgHwnd
     
-    GdipCreateEffect2 kind, effect
+    GdipCreateEffect2 kind, Effect
     
     effectindex = index
 End Sub
 Private Sub ApplyEffectStep2()
     GdipGetImageWidth effectimg, effectw: GdipGetImageHeight effectimg, effecth
-    GdipBitmapApplyEffect effectimg, effect, NewRectL(0, 0, effectw, effecth), 0, 0, 0
+    GdipBitmapApplyEffect effectimg, Effect, NewRectL(0, 0, effectw, effecth), 0, 0, 0
     
-    GdipDeleteEffect effect '垃圾处理
+    GdipDeleteEffect Effect '垃圾处理
     
     Call ReDraw(effectindex)
 End Sub
@@ -95,7 +97,7 @@ Public Sub ApplyTintEffect(n, amount As Long, hue As Long)
     e.hue = hue
     
     ApplyEffect n, Tint
-    GdipSetEffectParameters effect, e, LenB(e)
+    GdipSetEffectParameters Effect, e, LenB(e)
     ApplyEffectStep2
 End Sub
 Public Sub ApplySharpenEffect(n, amount As Single, radius As Single)
@@ -104,7 +106,7 @@ Public Sub ApplySharpenEffect(n, amount As Single, radius As Single)
     e.radius = radius
 
     ApplyEffect n, Sharpen
-    GdipSetEffectParameters effect, e, LenB(e)
+    GdipSetEffectParameters Effect, e, LenB(e)
     ApplyEffectStep2
 End Sub
 Public Sub ApplyBlurEffect(n, radius As Long, edge As Integer)
@@ -113,7 +115,7 @@ Public Sub ApplyBlurEffect(n, radius As Long, edge As Integer)
     e.expandEdge = edge
 
     ApplyEffect n, Blur
-    GdipSetEffectParameters effect, e, LenB(e)
+    GdipSetEffectParameters Effect, e, LenB(e)
     ApplyEffectStep2
 End Sub
 Public Sub ApplyBrightnessContrastEffect(n, brightnessLevel As Long, contrastLevel As Long)
@@ -122,7 +124,7 @@ Public Sub ApplyBrightnessContrastEffect(n, brightnessLevel As Long, contrastLev
     e.contrastLevel = contrastLevel
 
     ApplyEffect n, BrightnessContrast
-    GdipSetEffectParameters effect, e, LenB(e)
+    GdipSetEffectParameters Effect, e, LenB(e)
     ApplyEffectStep2
 End Sub
 Public Sub ApplyColorBalanceEffect(n, cyanRed As Long, magentaGreen As Long, yellowBlue As Long)
@@ -132,7 +134,7 @@ Public Sub ApplyColorBalanceEffect(n, cyanRed As Long, magentaGreen As Long, yel
     e.yellowBlue = YellowGreen
 
     ApplyEffect n, ColorBalance
-    GdipSetEffectParameters effect, e, LenB(e)
+    GdipSetEffectParameters Effect, e, LenB(e)
     ApplyEffectStep2
 End Sub
 Public Sub ApplyColorCurveEffect(n, adjustment As CurveAdjustments, adjustValue As Long, channel As CurveChannel)
@@ -142,7 +144,7 @@ Public Sub ApplyColorCurveEffect(n, adjustment As CurveAdjustments, adjustValue 
     e.channel = channel
 
     ApplyEffect n, ColorCurve
-    GdipSetEffectParameters effect, e, LenB(e)
+    GdipSetEffectParameters Effect, e, LenB(e)
     ApplyEffectStep2
 End Sub
 Public Sub ApplyColorMatrixEffect(n, m() As Single)
@@ -153,7 +155,7 @@ Public Sub ApplyColorMatrixEffect(n, m() As Single)
         Next
     Next
     ApplyEffect n, ColorMatrix
-    GdipSetEffectParameters effect, e, LenB(e)
+    GdipSetEffectParameters Effect, e, LenB(e)
     ApplyEffectStep2
 End Sub
 Public Sub ApplyHueSaturationLightnessEffect(n, hueLevel As Long, lightnessLevel As Long, saturationLevel As Long)
@@ -163,7 +165,7 @@ Public Sub ApplyHueSaturationLightnessEffect(n, hueLevel As Long, lightnessLevel
     e.saturationLevel = saturationLevel
 
     ApplyEffect n, HueSaturationLightness
-    GdipSetEffectParameters effect, e, LenB(e)
+    GdipSetEffectParameters Effect, e, LenB(e)
     ApplyEffectStep2
 End Sub
 Public Sub ApplyLevelsEffect(n, highlight As Long, midtone As Long, Shadow As Long)
@@ -172,8 +174,8 @@ Public Sub ApplyLevelsEffect(n, highlight As Long, midtone As Long, Shadow As Lo
     e.midtone = midtone
     e.Shadow = Shadow
 
-    ApplyEffect n, Levels
-    GdipSetEffectParameters effect, e, LenB(e)
+    ApplyEffect n, levels
+    GdipSetEffectParameters Effect, e, LenB(e)
     ApplyEffectStep2
 End Sub
 Private Sub ReDraw(i As Integer)
@@ -215,12 +217,12 @@ Private Sub ReDraw(i As Integer)
     
     Mems(i).CrashIndex = UBound(ColorLists)
 End Sub
-Public Sub Add(mem As Long, kind As Integer, Name As String, Optional w, Optional h, Optional Folder As String = "")
+Public Sub Add(mem As Long, kind As Integer, name As String, Optional w, Optional h, Optional Folder As String = "")
     ReDim Preserve Mems(UBound(Mems) + 1)
     With Mems(UBound(Mems))
         .Hwnd = mem
         .kind = kind
-        .Name = Name
+        .name = name
         .Folder = Folder
         If Not IsMissing(w) Then .w = w
         If Not IsMissing(h) Then .h = h
@@ -291,7 +293,7 @@ Public Property Get ResourceGIFTime(index As Integer) As Long
     ResourceGIFTime = Mems(index).GIF.time
 End Property
 Public Property Get ResourceName(index As Integer) As Long
-    ResourceName = Mems(index).Name
+    ResourceName = Mems(index).name
 End Property
 Public Property Get ResourceHandle(index As Integer) As Long
     ResourceHandle = Mems(index).Hwnd
@@ -305,23 +307,26 @@ End Property
 Public Property Get ResourceImageHandle(index As Integer) As Long
     ResourceImageHandle = Mems(index).ImgHwnd
 End Property
-Public Function GetImage(ByVal Name As String) As Integer
+Public Function GetImage(ByVal name As String) As Integer
     For i = SearchIndex To UBound(Mems)
         If Mems(i).kind = 0 Then
-            If Mems(i).Name = Name Then GetImage = i: Exit For
+            If Mems(i).name = name Then GetImage = i: Exit For
         End If
     Next
     
     If HotLoad Then
         If GetImage = 0 Then
-            If Dir(AssetsFolder & Name) <> "" Then
-                newImage AssetsFolder & Name
-                GetImage = UBound(Mems)
-            End If
+            For i = 1 To UBound(AssetsFolder)
+                If IsExitAFile(AssetsFolder(i) & name) Then
+                    newImage AssetsFolder(i) & name, FolderParam1(i), FolderParam2(i)
+                    GetImage = UBound(Mems)
+                    Exit For
+                End If
+            Next
         End If
     End If
 End Function
-Public Sub newImage(path As String, Optional arg1, Optional arg2, Optional Name As String = "")
+Public Sub newImage(path As String, Optional arg1, Optional arg2, Optional name As String = "")
     'when arg1 is missing ; i.w = i.w
     'when arg2 is missing but arg1 has content ; i.w = i.w * arg1
     'other ; i.w = arg1
@@ -363,7 +368,7 @@ Public Sub newImage(path As String, Optional arg1, Optional arg2, Optional Name 
     temp = Split(path, "\")
     ReDim Preserve Mems(UBound(Mems) + 1)
     With Mems(UBound(Mems))
-        .Name = IIf(Name = "", temp(UBound(temp)), Name)
+        .name = IIf(name = "", temp(UBound(temp)), name)
         .Folder = temp(UBound(temp) - 1)
         .w = w
         .h = h
@@ -377,6 +382,8 @@ Public Sub newImage(path As String, Optional arg1, Optional arg2, Optional Name 
         GdipDeleteGraphics g
         Mems(UBound(Mems)).Imgs(s) = DC
     Next
+    
+    If w > GW * 0.5 Or h > GH * 0.5 Or NoLoadCrash Then Exit Sub
     
     Dim tempCo As Long, tCo(3) As Byte
     Dim iW As Long, iH As Long
@@ -400,8 +407,17 @@ Public Sub newImage(path As String, Optional arg1, Optional arg2, Optional Name 
     Mems(UBound(Mems)).CrashIndex = UBound(ColorLists)
 End Sub
 Public Sub NewImages(path As String, Optional arg1, Optional arg2)
-    AssetsFolder = path
-    If HotLoad Then Exit Sub
+
+    If HotLoad Then
+        ReDim Preserve AssetsFolder(UBound(AssetsFolder) + 1)
+        ReDim Preserve FolderParam1(UBound(FolderParam1) + 1)
+        ReDim Preserve FolderParam2(UBound(FolderParam2) + 1)
+        If Right(path, 1) <> "\" Then path = path & "\"
+        AssetsFolder(UBound(AssetsFolder)) = path
+        FolderParam1(UBound(FolderParam1)) = arg1
+        FolderParam2(UBound(FolderParam2)) = arg2
+        Exit Sub
+    End If
     
     Dim f As String, c As Long
     If Right(path, 1) <> "\" Then path = path & "\"
@@ -419,7 +435,7 @@ Public Sub NewImages(path As String, Optional arg1, Optional arg2)
     If index = 0 Then
         PreLoadCount = PreLoadCount + c
     Else
-        Tree = GetAssetsTree(path)
+        Tree = AssetsTrees(index)
         For i = 1 To UBound(Tree.files)
             ReDim Preserve Mems(UBound(Mems) + 1)
             Mems(UBound(Mems)) = Tree.files(i)
@@ -448,4 +464,3 @@ Public Sub NewImages(path As String, Optional arg1, Optional arg2)
     
     If index = 0 Then AddAssetsTree Tree, arg1, arg2
 End Sub
-

@@ -143,7 +143,7 @@ Public TopPage As Boolean
     Public Sub SwitchChannel(playname As String, channel As String)
         Dim s As Integer
         s = GetPlayAnimation(playname)
-        
+        If s = 0 Then Exit Sub
         For i = 1 To UBound(PlayAni(s).channel)
             If PlayAni(s).channel(i).name = channel Then
                 PlayAni(s).channel(i).CurrentFrame = 1
@@ -155,10 +155,11 @@ Public TopPage As Boolean
     End Sub
 '========================================================
 '   Images
-    Public Sub DrawAnimation(playname As String, x As Long, y As Long)
+    Public Sub DrawAnimation(playname As String, x As Long, y As Long, Optional Direction As ImgDirection = DirNormal)
         Dim s As Integer, m As Integer, w As Long, h As Long, last As Boolean
         
         s = GetPlayAnimation(playname)
+        If s = 0 Then Exit Sub
         
         With PlayAni(s).channel(PlayAni(s).CurrentChannel).frames(PlayAni(s).channel(PlayAni(s).CurrentChannel).CurrentFrame)
             For i = 0 To UBound(.aframes)
@@ -171,17 +172,18 @@ Public TopPage As Boolean
                     h = Res.ImgSize(.aframes(i).picindex, imgGetHeight) * .aframes(i).size
                     DrawImageEx .aframes(i).picindex, x + .aframes(i).x, y + .aframes(i).y, w, h, PlayAni(s).position
                 Else
-                    DrawImage .aframes(i).picindex, x + .aframes(i).x, y + .aframes(i).y, pos:=PlayAni(s).position, alpha:=.aframes(i).alpha
+                    DrawImage .aframes(i).picindex, x + .aframes(i).x, y + .aframes(i).y, pos:=PlayAni(s).position, alpha:=.aframes(i).alpha, Direction:=Direction
                 End If
             Next
             
+            Dim DisposeMark As Boolean
             If .tick <> 0 Then
                 last = (PlayAni(s).channel(PlayAni(s).CurrentChannel).CurrentFrame = UBound(PlayAni(s).channel(PlayAni(s).CurrentChannel).frames))
                 If GetTickCount - PlayAni(s).tick >= .tick Then
-                    If .msg = "dispose" Then DisposePlayAnimation playname: Exit Sub
-                    If .msg <> "" Then
+                    If .Msg = "dispose" Or .disposed Then DisposeMark = True
+                    If .Msg <> "" Then
                         On Error Resume Next
-                        CallByName SrcClass, "AnimationMsg", VbMethod, playname, .msg
+                        CallByName SrcClass, "AnimationMsg", VbMethod, playname, .Msg
                     End If
                     If last Then
                         PlayAni(s).channel(PlayAni(s).CurrentChannel).CurrentFrame = 1
@@ -198,6 +200,7 @@ Public TopPage As Boolean
             End If
         End With
         
+        If DisposeMark Then DisposePlayAnimation playname
     End Sub
     Public Sub DrawImageEx(n, x As Long, y As Long, Optional w, Optional h, Optional pos As PosAlign = posNormal, Optional animation As Integer = 0)
         Dim index As Integer
@@ -711,13 +714,13 @@ ReShape:
         
         NewAnimation = UBound(Anis)
     End Function
-    Public Sub StartAnimation(id As Integer, Optional delay As Long = 0)
-        Anis(id).Start = GetTickCount
-        Anis(id).delay = delay
-        Anis(id).mark = False
+    Public Sub StartAnimation(ID As Integer, Optional delay As Long = 0)
+        Anis(ID).Start = GetTickCount
+        Anis(ID).delay = delay
+        Anis(ID).mark = False
     End Sub
-    Public Function AnimationDone(id As Integer) As Boolean
-        AnimationDone = Anis(id).mark
+    Public Function AnimationDone(ID As Integer) As Boolean
+        AnimationDone = Anis(ID).mark
     End Function
 '========================================================
     'Control
@@ -904,6 +907,7 @@ ReShape:
         m = CheckMouse(x, y, w, h)
         PaintLine x + w / 2 - size / 2, y, x + w / 2 - size / 2, y + h, LineColor, size
         Paint 1, x, y + value * (h - w), w, w, BallColor
+        
         If m > 0 And Mouse.button > 0 Then
             value = (Mouse.y - y) / (h - w)
             If value < 0 Then value = 0

@@ -30,10 +30,10 @@ Attribute VB_Name = "GCore"
     Public Enum PosAlign
         posNormal = 0
         posOnCenter = 1
-        posOnLeft = 2
-        posOnTop = 3
-        posOnRight = 4
-        posOnBottom = 5
+        posOnLeft = 4
+        posOnTop = 5
+        posOnRight = 2
+        posOnBottom = 3
     End Enum
     Public Enum TranslationKind
         transFadeIn = 0
@@ -61,7 +61,7 @@ Attribute VB_Name = "GCore"
         Hwnd As Long
         ImgHwnd As Long
         Imgs(3) As Long
-        Name As String
+        name As String
         Folder As String
         w As Long
         h As Long
@@ -104,14 +104,24 @@ Attribute VB_Name = "GCore"
     Public FPSWarn As Long
     Public EmeraldInstalled As Boolean
     Public BassInstalled As Boolean
-    Public Const Version As Long = 19063006 '
+    Public Const Version As Long = 19070608      'hhhhhhhhxxxhhhhhhhhffff
     Public TextHandle As Long, WaitChr As String
-    Dim AssetsTrees() As AssetsTree
+    
+    Public AssetsTrees() As AssetsTree
     Dim LastKeyUpRet As Boolean
     Dim Wndproc As Long
 '================================================================================
     '读取INI
     Private Declare Function GetPrivateProfileString Lib "kernel32" Alias "GetPrivateProfileStringW" (ByVal lpApplicationName As Long, ByVal lpKeyName As Long, ByVal lpDefault As Long, ByVal lpReturnedString As Long, ByVal nSize As Long, ByVal lpFileName As Long) As Long
+    Public Function IsExitAFile(filespec As String) As Boolean
+            Dim FSO As Object
+            Set FSO = CreateObject("Scripting.FileSystemObject")
+            If FSO.fileExists(filespec) Then
+            IsExitAFile = True
+            Else: IsExitAFile = False
+            End If
+            Set FSO = Nothing
+    End Function
 '================================================================================
 '   运行时
 '   读取INI文件
@@ -206,6 +216,8 @@ Attribute VB_Name = "GCore"
         End If
         
         If DebugMode Then
+            Debuginfo.Show
+            Debuginfo.Hide
             DebugWindow.Show
         End If
         
@@ -219,6 +231,7 @@ Attribute VB_Name = "GCore"
     End Sub
     Public Sub EndEmerald()
         If DebugMode Then
+            Unload Debuginfo
             Unload DebugWindow
         End If
         
@@ -228,9 +241,9 @@ Attribute VB_Name = "GCore"
         TerminateGDIPlus
         If BassInstalled Then BASS_Free
     End Sub
-    Public Sub MakeFont(ByVal Name As String)
+    Public Sub MakeFont(ByVal name As String)
         Set EF = New GFont
-        EF.MakeFont Name
+        EF.MakeFont name
     End Sub
 '========================================================
 '   RunTime
@@ -427,7 +440,7 @@ sth:
                 data.PutData "UpdateAble", 1
                 If MsgBox("发现Emerald存在新版本，您希望现在前往下载吗？", vbYesNo + 48, "Emerald") = vbNo Then Exit Sub
                 
-                ShellExecuteA 0, "open", "https://github.com/Red-Error404/Emerald", "", "", SW_SHOW
+                ShellExecuteA 0, "open", "https://github.com/Red-Error404/Emerald/release", "", "", SW_SHOW
                 data.PutData "UpdateAble", 0
             End If
         Else
@@ -441,6 +454,8 @@ sth:
     Public Function AddAssetsTree(Tree As AssetsTree, arg1 As Variant, arg2 As Variant)
         ReDim Preserve AssetsTrees(UBound(AssetsTrees) + 1)
         AssetsTrees(UBound(AssetsTrees)) = Tree
+        AssetsTrees(UBound(AssetsTrees)).arg1 = arg1
+        AssetsTrees(UBound(AssetsTrees)).arg2 = arg2
     End Function
     Public Function FindAssetsTree(path As String, arg1 As Variant, arg2 As Variant) As Integer
         On Error Resume Next

@@ -13,7 +13,7 @@ Attribute VB_PredeclaredId = False
 Attribute VB_Exposed = False
 'Emerald Ïà¹Ø´úÂë
 
-Public Page As GPage, GW As Long, GH As Long
+Public Page As GPage, GW As Single, GH As Single
 Public PageMark As Long
 
 Public InputingText As String, InputAllow As Boolean
@@ -53,8 +53,8 @@ Public Sub ApplyCmd()
             If CurrentCmd < UBound(HistoryCmd) Then
                 CurrentCmd = CurrentCmd + 1
             Else
-                For i = 1 To UBound(HistoryCmd)
-                    HistoryCmd(i - 1) = HistoryCmd(i)
+                For I = 1 To UBound(HistoryCmd)
+                    HistoryCmd(I - 1) = HistoryCmd(I)
                 Next
                 HistoryCmd(UBound(HistoryCmd)) = ""
             End If
@@ -143,16 +143,17 @@ Private Sub CheckUpdate(force As Boolean)
     If InternetGetConnectedState(0&, 0&) = 0 And force = False Then
         SetConsoleColor colors.ErrText
         WriteLine "Emerald-Error: connect to the Internet first ."
+        Err.Clear
         Exit Sub
     End If
     
-    Dim data As New GSaving
-    data.Create "Emerald.Core"
-    data.AutoSave = True
-    If Now - CDate(data.GetData("UpdateTime")) >= UpdateCheckInterval Or force Or data.GetData("UpdateAble") = 1 Then
-        data.PutData "UpdateTime", Now
+    Dim Data As New GSaving
+    Data.Create "Emerald.Core"
+    Data.AutoSave = True
+    If Now - CDate(Data.GetData("UpdateTime")) >= UpdateCheckInterval Or force Or Data.GetData("UpdateAble") = 1 Then
+        Data.PutData "UpdateTime", Now
         
-        Dim xmlHttp As Object, Ret As String, Start As Long
+        Dim xmlHttp As Object, ret As String, Start As Long
         
         SetConsoleColor colors.DefaultText
         WriteLine "Emerald: connecting to the server"
@@ -164,7 +165,7 @@ Private Sub CheckUpdate(force As Boolean)
             Sleep 10: DoEvents
         Loop
         
-        Set xmlHttp = CreateObject("Microsoft.XMLHTTP")
+        Set xmlHttp = PoolCreateObject("Microsoft.XMLHTTP")
         xmlHttp.Open "GET", "https://raw.githubusercontent.com/Red-Error404/Emerald/master/Version.txt", True
         xmlHttp.send
                      
@@ -173,7 +174,8 @@ Private Sub CheckUpdate(force As Boolean)
         Do While xmlHttp.ReadyState <> 4
             If GetTickCount - Start >= UpdateTimeOut Then
                 SetConsoleColor colors.ErrText
-                WriteLine "Emerald-Error: failed to connect , time out ."
+                WriteLine "Emerald-Error: failed to connect , time out "
+                Err.Clear
                 Exit Sub
             End If
             Call BackLine: Call ClearLine
@@ -181,30 +183,31 @@ Private Sub CheckUpdate(force As Boolean)
             Debuginfo.UpdateTimer_Timer
             Sleep 10: DoEvents
         Loop
-        Ret = xmlHttp.responseText
+        ret = xmlHttp.responseText
         Set xmlHttp = Nothing
         SetConsoleColor colors.SuccessText
-        WriteLine "Emerald-Success: the lastest version from the server " & Val(Ret)
+        WriteLine "Emerald-Success: the lastest version from the server " & Val(ret)
         SetConsoleColor colors.ContentText
         WriteLine "Emerald: current version " & Version
         
-        If Val(Ret) > Version And App.LogMode = 0 Then
+        If Val(ret) > Version And App.LogMode = 0 Then
             SetConsoleColor colors.SuccessText
             WriteLine "Emerald: update available , plz visit 'https://github.com/Red-Error404/Emerald/release' to download ."
             Exit Sub
         End If
     Else
         SetConsoleColor colors.HighLightText
-        WriteLine "Emerald-Skip: update has been checked at " & CDate(data.GetData("UpdateTime")) & "."
+        WriteLine "Emerald-Skip: update has been checked at " & CDate(Data.GetData("UpdateTime")) & "."
     End If
     
-    Set data = Nothing
+    Err.Clear
+    Set Data = Nothing
 End Sub
 Public Function GetVBIDEPath() As String
     On Error GoTo ErrHandle
     
     Dim WSHShell As Object, temp As String, temp2() As String
-    Set WSHShell = CreateObject("WScript.Shell")
+    Set WSHShell = PoolCreateObject("WScript.Shell")
     
     temp = WSHShell.RegRead("HKEY_CLASSES_ROOT\VisualBasic.Project\shell\open\command\")
     temp2 = Split(temp, "vb6.exe")
@@ -219,7 +222,26 @@ Public Sub RunExec()
     Dim MissingParam As Integer
 
     Select Case Exec
+        Case "poolinfo"
+            Select Case Params(1)
+                Case "-help"
+                    WriteWord "Show pool information ."
+                    Call ExitExec
+                    Exit Sub
+                Case ""
+                    Dim poolinfo() As String
+                    poolinfo = Split(GetCountStr, vbCrLf)
+                    For I = 0 To UBound(poolinfo)
+                        WriteLine poolinfo(I)
+                    Next
+                    Call ExitExec
+                    Exit Sub
+                Case Else: GoTo UnKnownCmd
+            End Select
         Case "backup"
+            SetConsoleColor colors.ErrText
+            WriteLine "Note£ºThis function will be removed on 7.20 ."
+            SetConsoleColor colors.DefaultText
             Select Case Params(1)
                 Case "-help"
                     WriteLine "Mange your backups ."
@@ -251,7 +273,7 @@ Public Sub RunExec()
                     If UBound(Params) = 3 Then targetFile = Params(3): WriteLine "Finding"
                     
 ReCopy:
-                    On Error Resume Next
+                    'On Error Resume Next
                     Do While bFile <> ""
                         If targetFile <> "" Then
                             BackLine
@@ -308,7 +330,7 @@ ReCopy:
                 Case "-clear2"
                 Case "-clear3"
                     Dim FSO3 As Object
-                    Set FSO3 = CreateObject("Scripting.FileSystemObject")
+                    Set FSO3 = PoolCreateObject("Scripting.FileSystemObject")
                     FSO3.DeleteFolder App.path & "\.emr\backup"
                     SetConsoleColor colors.DefaultText
                     WriteLine "Erasing"
@@ -326,7 +348,7 @@ ReCopy:
                     Exit Sub
                 Case "-list"
                     Dim backupF As String, backupI As Integer, FSO As Object
-                    Set FSO = CreateObject("Scripting.FileSystemObject")
+                    Set FSO = PoolCreateObject("Scripting.FileSystemObject")
                     backupF = Dir(App.path & "\.emr\backup\", vbDirectory)
                     Do While backupF <> ""
                         If backupF <> "." And backupF <> ".." Then
@@ -372,7 +394,7 @@ ReCopy:
                     SetConsoleColor colors.DefaultText
                     WriteWord "Project name : "
                     SetConsoleColor colors.ContentText
-                    WriteWord App.title
+                    WriteWord App.Title
                     NewLine
                     SetConsoleColor colors.DefaultText
                     WriteWord "Save state : "
@@ -401,7 +423,7 @@ ReCopy:
                     SetConsoleColor colors.DefaultText
                     WriteLine "Active page : " & ECore.ActivePage
                     WriteLine "FPS " & FPS & " , max FPS " & Int(1000 / Int(FPSct / FPS)) & " (per frame " & Int(FPSct / FPS) & " ms)"
-                    WriteLine "Button " & Mouse.button & " , click state " & Mouse.state & " , in (" & Mouse.x & "," & Mouse.y & ")"
+                    WriteLine "Button " & Mouse.button & " , click state " & Mouse.State & " , in (" & Mouse.X & "," & Mouse.y & ")"
                     NewLine
                     SetConsoleColor colors.HighLightText
                     WriteLine "Visual Basic 6.0 IDE"
@@ -424,8 +446,8 @@ ReCopy:
                     WriteLine "Animation : " & IIf(EAni Is Nothing, "[Missing]", ObjPtr(EAni))
                     WriteLine "Music List : " & IIf(EAni Is Nothing, "[Missing]", ObjPtr(EMusic))
                     WriteLine "Assets Tree : " & UBound(AssetsTrees) & " trees in total ."
-                    For i = 1 To UBound(AssetsTrees)
-                        WriteLine i & ". " & AssetsTrees(i).path & " (" & IIf(IsMissing(AssetsTrees(i).arg1), "[Missing]", AssetsTrees(i).arg1) & "," & IIf(IsMissing(AssetsTrees(i).arg2), "[Missing]", AssetsTrees(i).arg2) & ") , " & UBound(AssetsTrees(i).files) & " files in total ."
+                    For I = 1 To UBound(AssetsTrees)
+                        WriteLine I & ". " & AssetsTrees(I).path & " (" & IIf(IsMissing(AssetsTrees(I).arg1), "[Missing]", AssetsTrees(I).arg1) & "," & IIf(IsMissing(AssetsTrees(I).arg2), "[Missing]", AssetsTrees(I).arg2) & ") , " & UBound(AssetsTrees(I).Files) & " files in total ."
                     Next
                     WriteLine "Current EditBox : " & TextHandle
                     WriteLine "Bass : " & BassInstalled
@@ -495,9 +517,9 @@ ReCopy:
                 Case "-changekey3"
                     ESave.Key = Params(2)
                     SetConsoleColor colors.ContentText
-                    For i = 1 To ESave.Count
-                        ESave.PutData ESave.GetName(Val(i)), ESave.GetData(ESave.GetName(Val(i)))
-                        WriteLine "Rewriting : " & ESave.GetName(Val(i)) & "(item " & i & ")"
+                    For I = 1 To ESave.Count
+                        ESave.PutData ESave.GetName(Val(I)), ESave.GetData(ESave.GetName(Val(I)))
+                        WriteLine "Rewriting : " & ESave.GetName(Val(I)) & "(item " & I & ")"
                     Next
                     SetConsoleColor colors.ErrText
                     WriteWord "NOTE : Remember to change your key in your code !"
@@ -523,10 +545,10 @@ ReCopy:
                     SetConsoleColor colors.DefaultText
                     WriteLine ESave.Count & " items in total ."
                     Dim savestr As String
-                    For i = 1 To ESave.Count
-                        savestr = ESave.GetData(ESave.GetName(Val(i)))
+                    For I = 1 To ESave.Count
+                        savestr = ESave.GetData(ESave.GetName(Val(I)))
                         SetConsoleColor IIf(savestr = "", colors.ContentText, colors.DefaultText)
-                        WriteLine i & ". " & IIf(savestr = "", "[Removed]", "[Safe]") & "    " & ESave.GetName(Val(i)) & "    " & savestr
+                        WriteLine I & ". " & IIf(savestr = "", "[Removed]", "[Safe]") & "    " & ESave.GetName(Val(I)) & "    " & savestr
                     Next
                     Call ExitExec
                     Exit Sub
@@ -666,7 +688,7 @@ ReCopy:
             Call BackLine: Call ClearLine
             SetConsoleColor colors.DefaultText
             Select Case Params(1)
-                Case "": WriteWord "Button " & Mouse.button & " , click state " & Mouse.state & " , in (" & Mouse.x & "," & Mouse.y & ")"
+                Case "": WriteWord "Button " & Mouse.button & " , click state " & Mouse.State & " , in (" & Mouse.X & "," & Mouse.y & ")"
                 Case "-help"
                     WriteWord "No any commands ."
                     Call ExitExec
@@ -710,7 +732,7 @@ Public Sub AllowCmd()
     SetConsoleColor colors.ErrText
     WriteWord "VB>"
     SetConsoleColor colors.HighLightText
-    WriteWord App.title & ">"
+    WriteWord App.Title & ">"
     If Exec <> "" Then
         SetConsoleColor colors.DefaultText
         WriteWord Exec & ">"
@@ -764,12 +786,12 @@ Public Sub NewLine()
     End If
     CuX = 0
 End Sub
-Public Sub SetConsoleColor(c As Long)
-    Color = c
+Public Sub SetConsoleColor(C As Long)
+    Color = C
 End Sub
 Public Sub InitConsole()
     ConsoleDC = CreateCDC(GW - 20, 3222)
-    GdipCreateFromHDC ConsoleDC, ConsoleGG
+    PoolCreateFromHdc ConsoleDC, ConsoleGG
     GdipSetSmoothingMode ConsoleGG, SmoothingModeAntiAlias
     GdipSetTextRenderingHint ConsoleGG, TextRenderingHintAntiAlias
 End Sub
@@ -788,7 +810,7 @@ Public Sub Update2()
         SetConsoleColor colors.DefaultText
         WriteWord "Project name : "
         SetConsoleColor colors.ContentText
-        WriteWord App.title
+        WriteWord App.Title
         NewLine
         SetConsoleColor colors.DefaultText
         WriteWord "Save state : "
@@ -837,6 +859,7 @@ Public Sub Update2()
         NeedScroll = True
     End If
     
+    Page.Paint 0, 1, 1, GW - 1, GH - 1, argb(255, 0, 183, 195), size:=2, style:=1
     Page.Paint 0, 0, 0, GW + 1, 40, argb(255, 0, 183, 195)
     Page.Writes "Emerald Console", 20, 9, 16, argb(255, 27, 27, 27)
     
@@ -846,9 +869,12 @@ Public Sub Update()
 
     On Error Resume Next
     
-    Page.Writes FPS & "/" & Int(1000 / Int(FPSct / FPS)), 15, 14, 34, argb(205, 182, 174, 173)
+    Page.PaintLine -1, GH - 1, GW * 1, GH - 1, argb(255, 0, 183, 195), 2
+    If FPS <> 0 Then Page.Writes FPS & "/" & Int(1000 / Int(FPSct / FPS)), 15, 14, 34, argb(205, 182, 174, 173)
     
     Page.DrawImage "mouse" & Mouse.button & ".png", GW - 138, 78 / 2 - 64 / 2, alpha:=1
+    If Debug_mouse Then Page.Paint 0, GW - 74 - 64, 0, 64, 79, argb(50, 128, 128, 128)
+    
     Page.DrawImage "menu.png", GW - 74, 78 / 2 - 64 / 2, alpha:=1
     If Debuginfo.Visible Then Page.Paint 0, GW - 74, 0, 64, 79, argb(50, 128, 128, 128)
     
@@ -876,7 +902,7 @@ End Sub
 Public Sub Lostfocus()
 
 End Sub
-Public Sub AnimationDone(ID As Integer)
+Public Sub AnimationDone(id As Integer)
 
 End Sub
 

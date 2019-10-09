@@ -31,10 +31,10 @@ Attribute VB_Exposed = False
 '==================================================
 '   页面管理器
     Dim EC As GMan
-    Dim oShadow As New aShadow
 '==================================================
 Private Sub DrawTimer_Timer()
     '绘制
+    If EC.ActivePage = "" Then Exit Sub
     EC.Display
 End Sub
 
@@ -45,64 +45,64 @@ End Sub
 
 Private Sub Form_Load()
     '初始化Emerald
-    StartEmerald Me.Hwnd, 805, 556
+    StartEmerald Me.Hwnd, 991, 754
     DebugSwitch.HideLOGO = 1
     DebugSwitch.DisableLOGO = 1
-     
+    
     '创建字体
-    MakeFont "微软雅黑"
+    Set EF = New GFont
+    If PackPos = -1 Then
+        EF.AddFont App.path & "\Builder.UI.otf"
+        EF.MakeFont "Abadi MT Extra Light"
+        'EF.MakeFont "微软雅黑"
+    Else
+        EF.MakeFont "微软雅黑"
+    End If
+    
     '创建页面管理器
     Set EC = New GMan
-    EC.Layered True
+    If PackPos = -1 Then EC.Layered False
     
     '创建存档（可选）
     Set ESave = New GSaving
-    ESave.Create "Emerald.builder", "Emerald.builder"
+    ESave.Create "Emerald.Core"
     ESave.AutoSave = True
     
     '创建音乐列表
     Set MusicList = New GMusicList
     MusicList.Create App.path & "\music"
 
-    '开始显示
-    With oShadow
-        If .Shadow(Me) Then
-            .Depth = 20
-            .Transparency = 16
-        End If
-    End With
-    
     '在此处初始化你的页面
-    Set WelcomePage = New WelcomePage
-    Set SetupPage = New SetupPage
-    Set WaitPage = New WaitPage
-    Set DialogPage = New DialogPage
-    Set UpdatePage = New UpdatePage
-    
-    Set TitleBar = New TitleBar
+    If PackPos = -1 Then
+        Set WelcomePage = New WelcomePage
+        Set ToNewPage = New ToNewPage
+        Set TitleBar = New TitleBar
+    Else
+        Set SetupPage = New SetupPage
+    End If
 
     '设置活动页面
-    EC.ActivePage = "WaitPage"
+    If PackPos = -1 Then EC.ActivePage = "WelcomePage"
     
     DrawTimer.Enabled = True
 End Sub
 
-Private Sub Form_MouseDown(button As Integer, Shift As Integer, x As Single, y As Single)
+Private Sub Form_MouseDown(button As Integer, Shift As Integer, X As Single, y As Single)
     '发送鼠标信息
-    UpdateMouse x, y, 1, button
+    UpdateMouse X, y, 1, button
 End Sub
 
-Private Sub Form_MouseMove(button As Integer, Shift As Integer, x As Single, y As Single)
+Private Sub Form_MouseMove(button As Integer, Shift As Integer, X As Single, y As Single)
     '发送鼠标信息
-    If Mouse.state = 0 Then
-        UpdateMouse x, y, 0, button
+    If Mouse.State = 0 Then
+        UpdateMouse X, y, 0, button
     Else
-        Mouse.x = x: Mouse.y = y
+        Mouse.X = X: Mouse.y = y
     End If
 End Sub
-Private Sub Form_MouseUp(button As Integer, Shift As Integer, x As Single, y As Single)
+Private Sub Form_MouseUp(button As Integer, Shift As Integer, X As Single, y As Single)
     '发送鼠标信息
-    UpdateMouse x, y, 2, button
+    UpdateMouse X, y, 2, button
 End Sub
 
 Private Sub Form_Unload(Cancel As Integer)
@@ -110,4 +110,14 @@ Private Sub Form_Unload(Cancel As Integer)
     DrawTimer.Enabled = False
     '释放Emerald资源
     EndEmerald
+    If CmdMark = "Uninstall" Then
+        Open VBA.Environ("temp") & "\copyemr.cmd" For Output As #1
+        Print #1, "@echo off"
+        Print #1, "echo 卸载程序正在清除残留文件 , Emerald Builder 版本号: " & Version
+        Print #1, "echo 正在清理残留文件 ..."
+        Print #1, "ping localhost -n 5 > nul"
+        Print #1, "rd /s /q """ & App.path & """"
+        Close #1
+        ShellExecuteA 0, "open", VBA.Environ("temp") & "\copyemr.cmd", "", "", SW_SHOW
+    End If
 End Sub

@@ -15,20 +15,23 @@ Attribute VB_Exposed = False
 
 Private Type Page
     p As GPage
-    name As String
+    Name As String
 End Type
 Private Type Transform
-    kind As TranslationKind
-    time As Long
+    Kind As TranslationKind
+    Time As Long
     during As Long
 End Type
 Dim Pages() As Page, Transform As Transform
 Dim mPage As String, aPage As Object
 Dim OutOfWindow As Boolean
 Dim FirstPlay As Boolean
-Public CDC As Long, ODC As Long, GG As Long, pB As Long
+Public CDC As Long, ODC As Long, GG As Long, pB As Long, pen As Long
 Public LastPage As String
+Public UpdatingPage As String, LockPage As String, UPage As GPage
+Dim CurrentPage As Integer
 Dim IsLayered As Boolean
+Dim ErrorMark As Boolean, ErrorMark2 As Boolean
 '========================================================
 '   Init
     Private Sub Class_Initialize()
@@ -36,10 +39,11 @@ Dim IsLayered As Boolean
         ReDim Pages(0)
         CDC = CreateCDC(GW, GH)
         ODC = CreateCDC(GW, GH)
-        GdipCreateFromHDC CDC, GG
+        PoolCreateFromHdc CDC, GG
         GdipSetSmoothingMode GG, SmoothingModeAntiAlias
         GdipSetTextRenderingHint GG, TextRenderingHintAntiAlias
-        GdipCreateSolidFill argb(255, 255, 255, 255), pB
+        PoolCreateSolidFill argb(255, 255, 255, 255), pB
+        PoolCreatePen1 argb(255, 255, 255, 255), 1, UnitPixel, pen
     End Sub
     Public Sub Layered(Optional WithAero As Boolean = False)
         SetWindowLongA GHwnd, GWL_EXSTYLE, GetWindowLongA(GHwnd, GWL_EXSTYLE) Or WS_EX_LAYERED
@@ -47,21 +51,22 @@ Dim IsLayered As Boolean
         IsLayered = True
     End Sub
     Public Sub Dispose()
-        GdipDeleteGraphics GG
-        GdipDeleteBrush pB
-        For i = 1 To UBound(Pages)
-            Pages(i).p.Dispose
+        PoolDeleteGraphics GG
+        PoolDeleteBrush pB
+        PoolDeletePen pen
+        For I = 1 To UBound(Pages)
+            Pages(I).p.Dispose
         Next
-        DeleteObject CDC
-        DeleteObject ODC
+        'DeleteObject CDC
+        'DeleteObject ODC
     End Sub
 '========================================================
 '   Manager
-    Public Sub Add(p As GPage, name As String)
+    Public Sub Add(p As GPage, Name As String)
         ReDim Preserve Pages(UBound(Pages) + 1)
         With Pages(UBound(Pages))
             Set .p = p
-            .name = name
+            .Name = Name
         End With
     End Sub
     Public Property Get ActivePage() As String
@@ -69,14 +74,14 @@ Dim IsLayered As Boolean
     End Property
     Public Property Let ActivePage(nPage As String)
         LastPage = mPage
-        For i = 1 To UBound(Pages)
-            If mPage = Pages(i).name Then CallByName Pages(i).p.SrcClass, "Leave", VbMethod: Exit For
+        For I = 1 To UBound(Pages)
+            If mPage = Pages(I).Name Then CallByName Pages(I).p.SrcClass, "Leave", VbMethod: Exit For
         Next
         mPage = nPage
-        For i = 1 To UBound(Pages)
-            If nPage = Pages(i).name Then
-                CallByName Pages(i).p.SrcClass, "Enter", VbMethod
-                Set aPage = Pages(i).p.SrcClass
+        For I = 1 To UBound(Pages)
+            If nPage = Pages(I).Name Then
+                CallByName Pages(I).p.SrcClass, "Enter", VbMethod
+                Set aPage = Pages(I).p.SrcClass
                 Exit For
             End If
         Next
@@ -87,6 +92,8 @@ Dim IsLayered As Boolean
 '========================================================
 '   Draw
     Public Sub Display()
+        If ErrorMark2 Then Exit Sub
+
         Dim o As Boolean, t As Long, played As Boolean
         
         t = Timer * 1000
@@ -104,17 +111,22 @@ Dim IsLayered As Boolean
             End If
         End If
 
-        For i = 1 To UBound(Pages)
-            If ActivePage = Pages(i).name Or Pages(i).p.TopPage Then
-                Pages(i).p.Update: Pages(i).p.Display (CDC)
+        For I = 1 To UBound(Pages)
+            CurrentPage = I
+            If ActivePage = Pages(I).Name Or (Pages(I).p.TopPage And (Not ErrorMark)) Then
+                UpdatingPage = Pages(I).Name
+                Set UPage = Pages(I).p
+                Pages(I).p.Update
+                Pages(I).p.Display (CDC)
+                If Pages(I).Name = "ErrorScreen" Then ErrorMark2 = True
                 played = True
                 o = (GetActiveWindow = 0)
                 If o <> OutOfWindow Then
                     OutOfWindow = o
                     If OutOfWindow Then
-                        CallByName Pages(i).p.SrcClass, "Lostfocus", VbMethod
+                        CallByName Pages(I).p.SrcClass, "Lostfocus", VbMethod
                     Else
-                        CallByName Pages(i).p.SrcClass, "Gotfocus", VbMethod
+                        CallByName Pages(I).p.SrcClass, "Gotfocus", VbMethod
                     End If
                 End If
             End If
@@ -122,11 +134,37 @@ Dim IsLayered As Boolean
         
 skipPage:
         If Not played Then
-            GdipGraphicsClear GG, argb(255, 255, 255, 255)
-            EF.Writes "页面""" & ActivePage & """不存在", GW / 2, GH / 2, GG, argb(255, 27, 27, 27), 20, 0, 0, StringAlignmentCenter, FontStyleBold
+            GdipGraphicsClear GG, argb(255, 0, 0, 0)
+            Suggest "页面""" & ActivePage & """不存在。", ClearOnUpdate, 2
         End If
         
-        If GetTickCount - Transform.time <= Transform.during Then Call Translation
+        If GetTickCount - Transform.Time <= Transform.during Then Call Translation
+        
+        If App.LogMode = 0 Then
+            Dim SOrIndex As Integer
+            SOrIndex = SysPage.index
+            SysPage.index = 4
+            SysPage.Page.Update
+            SysPage.Page.Display (CDC)
+            SysPage.index = SOrIndex
+            For I = 1 To UBound(SGS)
+                If I > UBound(SGS) Then Exit For
+                If SGS(I).ClearTime = ClearOnUpdate Then GoTo ClearSGS
+                If SGS(I).ClearTime = ClearOnOnce And GetTickCount - SGS(I).Time >= 1000 Then GoTo ClearSGS
+                GoTo NoClear
+ClearSGS:
+                SGS(I) = SGS(UBound(SGS)): ReDim Preserve SGS(UBound(SGS) - 1): I = I - 1
+NoClear:
+            Next
+            
+            If GetTickCount - FPSt >= 1000 Then
+                FPSt = GetTickCount: FPS = tFPS: tFPS = 0
+                If FPS < 20 Then
+                    Suggest "FPS过低。", ClearOnOnce, 2
+                End If
+                FPSct = FPSctt: FPSctt = 0
+            End If
+        End If
         
         If IsLayered Then
             Dim bs As BLENDFUNCTION, sz As size
@@ -145,27 +183,17 @@ skipPage:
         End If
         tFPS = tFPS + 1: FPSctt = FPSctt + (Timer * 1000 - t)
         
-        If GetTickCount - FPSt >= 1000 Then
-            FPSt = GetTickCount: FPS = tFPS: tFPS = 0
-            If FPS < 20 Then
-                If FPSWarn < 10 Then FPSWarn = FPSWarn + 1
-                If FPSWarn = 10 Then Suggest "FPS过低了噢！你是想要让玩家玩PPT嘛！": FPSWarn = FPSWarn + 1
-            ElseIf FPSWarn <> 0 Then
-                FPSWarn = 0
-            End If
-            FPSct = FPSctt: FPSctt = 0
-        End If
+        If Mouse.State = 2 Then Mouse.State = 0
         
-        If Mouse.state = 2 Then Mouse.state = 0
     End Sub
 '========================================================
 '   Transform
-    Public Sub NewTransform(Optional kind As TranslationKind = transFadeIn, Optional during As Long = 300, Optional newPage)
+    Public Sub NewTransform(Optional Kind As TranslationKind = transFadeIn, Optional during As Long = 300, Optional newPage)
         PaintDC CDC, ODC
         With Transform
             .during = during
-            .kind = kind
-            .time = GetTickCount
+            .Kind = Kind
+            .Time = GetTickCount
         End With
         
         If Not IsMissing(newPage) Then
@@ -174,39 +202,39 @@ skipPage:
     End Sub
     Private Sub Translation()
         Dim pro As Single
-        Select Case Transform.kind
+        Select Case Transform.Kind
             Case 0 'FadeIn
-                pro = Cubic((GetTickCount - Transform.time) / Transform.during, 0, 1, 1, 1)
+                pro = Cubic((GetTickCount - Transform.Time) / Transform.during, 0, 1, 1, 1)
                 PaintDC ODC, CDC, alpha:=1 - pro
             Case 1 'FadeOut
-                pro = Cubic((GetTickCount - Transform.time) / Transform.during, 0, 0, 0, 1)
+                pro = Cubic((GetTickCount - Transform.Time) / Transform.during, 0, 0, 0, 1)
                 PaintDC ODC, CDC, alpha:=1 - pro
             Case 2 'ToRight
-                pro = Cubic((GetTickCount - Transform.time) / Transform.during, 0, 1, 1, 1)
+                pro = Cubic((GetTickCount - Transform.Time) / Transform.during, 0, 1, 1, 1)
                 PaintDC ODC, CDC, (pro * GW), alpha:=1
             Case 3 'ToLeft
-                pro = Cubic((GetTickCount - Transform.time) / Transform.during, 0, 1, 1, 1)
+                pro = Cubic((GetTickCount - Transform.Time) / Transform.during, 0, 1, 1, 1)
                 PaintDC ODC, CDC, -(pro * GW), alpha:=1
             Case 4 'ToUp
-                pro = Cubic((GetTickCount - Transform.time) / Transform.during, 0, 1, 1, 1)
+                pro = Cubic((GetTickCount - Transform.Time) / Transform.during, 0, 1, 1, 1)
                 PaintDC ODC, CDC, 0, -(pro * GW), alpha:=1
             Case 5 'ToDown
-                pro = Cubic((GetTickCount - Transform.time) / Transform.during, 0, 1, 1, 1)
+                pro = Cubic((GetTickCount - Transform.Time) / Transform.during, 0, 1, 1, 1)
                 PaintDC ODC, CDC, 0, (pro * GW), alpha:=1
             Case 6 'ToRight(Fade)
-                pro = Cubic((GetTickCount - Transform.time) / Transform.during, 0, 1, 1, 1)
+                pro = Cubic((GetTickCount - Transform.Time) / Transform.during, 0, 1, 1, 1)
                 PaintDC ODC, CDC, (pro * GW), alpha:=1 - pro
             Case 7 'ToLeft(Fade)
-                pro = Cubic((GetTickCount - Transform.time) / Transform.during, 0, 1, 1, 1)
+                pro = Cubic((GetTickCount - Transform.Time) / Transform.during, 0, 1, 1, 1)
                 PaintDC ODC, CDC, -(pro * GW), alpha:=1 - pro
             Case 8 'ToUp(Fade)
-                pro = Cubic((GetTickCount - Transform.time) / Transform.during, 0, 1, 1, 1)
+                pro = Cubic((GetTickCount - Transform.Time) / Transform.during, 0, 1, 1, 1)
                 PaintDC ODC, CDC, 0, -(pro * GW), alpha:=1 - pro
             Case 9 'ToDown(Fade)
-                pro = Cubic((GetTickCount - Transform.time) / Transform.during, 0, 1, 1, 1)
+                pro = Cubic((GetTickCount - Transform.Time) / Transform.during, 0, 1, 1, 1)
                 PaintDC ODC, CDC, 0, (pro * GW), alpha:=1 - pro
             Case 10 'HighLight
-                pro = (GetTickCount - Transform.time) / Transform.during
+                pro = (GetTickCount - Transform.Time) / Transform.during
                 Select Case pro
                     Case Is < 0.2
                         pro = Cubic(pro / 0.2, 0, 1, 1, 1)
@@ -221,7 +249,7 @@ skipPage:
                         GdipFillRectangle GG, pB, 0, 0, GW, GH
                 End Select
             Case 11 'Dark
-                pro = (GetTickCount - Transform.time) / Transform.during
+                pro = (GetTickCount - Transform.Time) / Transform.during
                 Select Case pro
                     Case Is < 0.2
                         pro = Cubic(pro / 0.2, 0, 1, 1, 1)
@@ -235,6 +263,22 @@ skipPage:
                         GdipSetSolidFillColor pB, argb((1 - pro) * 255, 0, 0, 0)
                         GdipFillRectangle GG, pB, 0, 0, GW, GH
                 End Select
+            Case 12
+                pro = Cubic((GetTickCount - Transform.Time) / Transform.during, 0, 1, 1, 1)
+                BitBlt CDC, GW - (pro * GW), 0, GW, GH, CDC, 0, 0, vbSrcCopy
+                GdipSetSolidFillColor pB, argb((1 - pro) * 255, 0, 0, 0)
+                GdipFillRectangle GG, pB, GW - (pro * GW), 0, GW, GH
+                PaintDC ODC, CDC, -(pro * GW), 0, alpha:=1
+                GdipSetSolidFillColor pB, argb(pro * 255, 0, 0, 0)
+                GdipFillRectangle GG, pB, -(pro * GW), 0, GW, GH
+            Case 13
+                pro = Cubic((GetTickCount - Transform.Time) / Transform.during, 0, 1, 1, 1)
+                BitBlt CDC, -GW + (pro * GW), 0, GW, GH, CDC, 0, 0, vbSrcCopy
+                GdipSetSolidFillColor pB, argb((1 - pro) * 255, 0, 0, 0)
+                GdipFillRectangle GG, pB, -GW + (pro * GW), 0, GW, GH
+                PaintDC ODC, CDC, (pro * GW), 0, alpha:=1
+                GdipSetSolidFillColor pB, argb(pro * 255, 0, 0, 0)
+                GdipFillRectangle GG, pB, (pro * GW), 0, GW, GH
         End Select
     End Sub
 '========================================================

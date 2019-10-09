@@ -38,7 +38,7 @@ Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 'Emerald Ïà¹Ø´úÂë
-Dim Page As GPage, Console As GDebug, sh As New aShadow
+Dim Page As GPage, Console As GDebug
 Dim WDC As Long
 Dim ScrollMode As Boolean
 
@@ -50,7 +50,7 @@ Private Sub Form_KeyPress(KeyAscii As Integer)
     ElseIf KeyAscii = vbKeyBack Then
         If Len(Console.InputingText) > 0 Then Console.InputingText = Left(Console.InputingText, Len(Console.InputingText) - 1)
     ElseIf KeyAscii >= 0 And KeyAscii <= 26 Then
-        On Error Resume Next
+        'On Error Resume Next
         If KeyAscii = 3 Then
             Clipboard.Clear
             Clipboard.SetText Console.InputingText
@@ -79,7 +79,7 @@ Private Sub Form_Load()
     Set Console = New GDebug
     
     Page.Create Console
-    Page.Res.NewImages App.path & "\assets\debug", 64, 64
+    Page.Res.NewImages App.Path & "\assets\debug", 64, 64
     
     Set Console.Page = Page
     Console.PageMark = 1
@@ -89,62 +89,53 @@ Private Sub Form_Load()
     Console.InitConsole
     
     WDC = CreateCDC(Console.GW, Console.GH)
-    DeleteObject Page.CDC
+    DeleteDC Page.CDC
     Page.CDC = WDC
     Dim g As Long
-    GdipCreateFromHDC WDC, g
+    PoolCreateFromHdc WDC, g
     GdipSetSmoothingMode g, SmoothingModeAntiAlias
     GdipSetTextRenderingHint g, TextRenderingHintAntiAlias
-    GdipDeleteGraphics Page.GG
+    PoolDeleteGraphics Page.GG
     Page.GG = g
     
     SetWindowLongA Me.Hwnd, GWL_EXSTYLE, GetWindowLongA(Me.Hwnd, GWL_EXSTYLE) Or WS_EX_LAYERED
     BlurWindow Me.Hwnd
-    
-    With sh
-        If .Shadow(Me) Then
-            .Color = RGB(0, 0, 0)
-            .Depth = 12
-            .Transparency = 32
-        End If
-    End With
 
 End Sub
 
-Private Sub Form_MouseDown(button As Integer, Shift As Integer, x As Single, y As Single)
+Private Sub Form_MouseDown(button As Integer, Shift As Integer, X As Single, y As Single)
     If y <= 40 And button = 1 Then
         ReleaseCapture
         SendMessageA Me.Hwnd, WM_SYSCOMMAND, SC_MOVE Or HTCAPTION, 0
     End If
-    Call Form_MouseMove(button, Shift, x, y)
+    Call Form_MouseMove(button, Shift, X, y)
     If button = 1 Then
-        If Console.NeedScroll And x >= Console.GW - 20 And x <= Console.GW - 10 And y >= 40 Then
+        If Console.NeedScroll And X >= Console.GW - 20 And X <= Console.GW - 10 And y >= 40 Then
             SetCapture Me.Hwnd
             ScrollMode = True
         End If
     End If
 End Sub
 
-Private Sub Form_MouseMove(button As Integer, Shift As Integer, x As Single, y As Single)
+Private Sub Form_MouseMove(button As Integer, Shift As Integer, X As Single, y As Single)
     If button = 1 Then
         If Console.NeedScroll And ScrollMode Then
             Dim MaxY As Single
             MaxY = (Console.CuY - Console.GH + 80) / 3220
-            Console.SY = (y - 60) / (Console.GH - 60 - 20) * MaxY
-            If Console.SY < 0 Then Console.SY = 0
-            If Console.SY > MaxY Then Console.SY = MaxY
+            Console.sy = (y - 60) / (Console.GH - 60 - 20) * MaxY
+            If Console.sy < 0 Then Console.sy = 0
+            If Console.sy > MaxY Then Console.sy = MaxY
         End If
     End If
 End Sub
 
-Private Sub Form_MouseUp(button As Integer, Shift As Integer, x As Single, y As Single)
-    Call Form_MouseMove(button, Shift, x, y)
+Private Sub Form_MouseUp(button As Integer, Shift As Integer, X As Single, y As Single)
+    Call Form_MouseMove(button, Shift, X, y)
     If ScrollMode Then ReleaseCapture: ScrollMode = False
 End Sub
 
 Private Sub Form_Unload(Cancel As Integer)
     Page.Dispose
-    Set sh = Nothing
 End Sub
 
 Public Sub UpdateTimer_Timer()

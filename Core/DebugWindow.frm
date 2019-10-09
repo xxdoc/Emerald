@@ -40,7 +40,7 @@ Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 'Emerald 相关代码
-Dim Page As GPage, Charge As GDebug, sh As New aShadow
+Dim Page As GPage, Charge As GDebug
 Dim WDC As Long
 Private Sub Form_Load()
     Set Page = New GPage
@@ -55,38 +55,30 @@ Private Sub Form_Load()
     Charge.GW = Me.ScaleWidth: Charge.GH = Me.ScaleHeight
     
     WDC = CreateCDC(Charge.GW, Charge.GH)
-    DeleteObject Page.CDC
+    DeleteDC Page.CDC
     Page.CDC = WDC
     Dim g As Long
-    GdipCreateFromHDC WDC, g
+    PoolCreateFromHdc WDC, g
     GdipSetSmoothingMode g, SmoothingModeAntiAlias
     GdipSetTextRenderingHint g, TextRenderingHintAntiAlias
-    GdipDeleteGraphics Page.GG
+    PoolDeleteGraphics Page.GG
     Page.GG = g
-    
-    With sh
-        If .Shadow(Me) Then
-            .Color = RGB(0, 0, 0)
-            .Depth = 12
-            .Transparency = 18
-        End If
-    End With
     
     Me.Move Screen.Width / 2 - Me.ScaleWidth * Screen.TwipsPerPixelX / 2, 0
     
     SetWindowPos Me.Hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE Or SWP_NOSIZE
     
-    For i = 1 To 5
-        Load touchArea(i)
-        With touchArea(i)
+    For I = 1 To 5
+        Load touchArea(I)
+        With touchArea(I)
             .Visible = True
             .ZOrder
-            .Move Me.ScaleWidth - 10 - 64 * i, 78 / 2 - 64 / 2, 64, 64
-            Select Case i
+            .Move Me.ScaleWidth - 10 - 64 * I, 78 / 2 - 64 / 2, 64, 64
+            Select Case I
                 Case 1
                     .ToolTipText = "详细信息窗口"
                 Case 2
-                    .ToolTipText = "鼠标状态指示"
+                    .ToolTipText = "鼠标状态指示&点击检测矩形"
                 Case 3
                     .ToolTipText = "显示/不显示绘制矩形"
                 Case 4
@@ -100,13 +92,14 @@ End Sub
 
 Private Sub Form_Unload(Cancel As Integer)
     Page.Dispose
-    Set sh = Nothing
 End Sub
 
 Public Sub touchArea_Click(index As Integer)
     Select Case index
         Case 1
             Debuginfo.Visible = Not Debuginfo.Visible
+        Case 2
+            Debug_mouse = Not Debug_mouse
         Case 3
             Debug_focus = Not Debug_focus
         Case 4

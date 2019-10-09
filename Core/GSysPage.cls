@@ -20,6 +20,7 @@ Public OpenTime As Long, DoneMark As Boolean, DoneStep As Integer
 Public DataPage As Integer
 Dim ChangeTime As Long, LastLoadPro As Single, LastLoadPro2 As Single
 Dim max2 As Long
+Dim LOGO As Long, bitmap As Long
 Public Sub Update()
     Page.Clear
     Select Case index
@@ -29,7 +30,42 @@ Public Sub Update()
         Call LOGODialog
         Case 3
         Call SaveManDialog
+        Case 4
+        Call SuggestionDialog
     End Select
+End Sub
+Public Sub SuggestionDialog()
+    Page.Clear argb(0, 0, 0, 0)
+    If IsKeyPress(VK_F12) Then
+        If UBound(SGS) = 0 Then
+            MsgBox "没有任何建议。", 48, "Emerald 建议中心"
+        Else
+            Dim ret As String, sRet As String
+            ret = "共 " & UBound(SGS) & " 项建议。" & vbCrLf & vbCrLf
+            For I = 1 To UBound(SGS)
+                Select Case SGS(I).Deepth
+                    Case 0: sRet = "(无关紧要)"
+                    Case 1: sRet = "(需要留意)"
+                    Case 2: sRet = "(*紧急)"
+                    Case 3: sRet = "(*非常紧急*)"
+                End Select
+                ret = ret & sRet & "    " & SGS(I).Content & vbCrLf
+            Next
+            MsgBox ret, 48, "Emerald 建议中心"
+        End If
+    End If
+    If GetTickCount - SGTime <= 3000 And UBound(SGS) <> 0 Then
+        Dim pro As Single
+        
+        If GetTickCount Mod 600 < 300 Then
+            pro = 0.6 + (GetTickCount Mod 300) / 300 * 0.4
+        Else
+            pro = 1 - (GetTickCount Mod 300) / 300 * 0.4
+        End If
+        
+        Page.Paint 2, GW / 2, GH / 2, 300, 40, argb(255 * pro, 255, 84, 57), 100, pos:=posOnCenter
+        Page.Writes "共 " & UBound(SGS) & " 项建议 (F12)", GW / 2, GH / 2 - 8 / 0.75, 16, argb(255, 255, 255, 255), align:=StringAlignmentCenter
+    End If
 End Sub
 Public Sub SaveManDialog()
     Page.Clear argb(220, 242, 242, 249)
@@ -54,18 +90,18 @@ Public Sub SaveManDialog()
         ESave.PutData temp2, temp
     End If
 
-    Dim max As Long, i As Integer
+    Dim max As Long, I As Integer
     max = Int(GH * 0.5 / 30)
 
-    For i = DataPage + 1 To DataPage + max
-        If i > ESave.Count Then Exit For
-        Page.Paint 1, GW / 2 - GW * 0.3 + 20, 80 + 30 + (i - DataPage) * 30 + 2, 20, 20, argb(255, 0, 176, 240)
+    For I = DataPage + 1 To DataPage + max
+        If I > ESave.Count Then Exit For
+        Page.Paint 1, GW / 2 - GW * 0.3 + 20, 80 + 30 + (I - DataPage) * 30 + 2, 20, 20, argb(255, 0, 176, 240)
         If CheckMouse2 = mMouseUp Then
-            temp = InputBox("输入新的值：" & vbCrLf & ESave.GetName(i), "存档修改", ESave.GetData(ESave.GetName(i)))
-            ESave.PutData ESave.GetName(i), temp
+            temp = InputBox("输入新的值：" & vbCrLf & ESave.GetName(I), "存档修改", ESave.GetData(ESave.GetName(I)))
+            ESave.PutData ESave.GetName(I), temp
         End If
-        Page.Writes ESave.GetName(i), GW / 2 - GW * 0.3 + 50, 80 + 30 + (i - DataPage) * 30, 18, argb(150, 27, 27, 27), align:=StringAlignmentNear, style:=FontStyleBold
-        Page.Writes ESave.GetData(ESave.GetName(i)), GW / 2 + GW * 0.3 - 30, 80 + 30 + (i - DataPage) * 30, 18, argb(150, 27, 27, 27), align:=StringAlignmentFar
+        Page.Writes ESave.GetName(I), GW / 2 - GW * 0.3 + 50, 80 + 30 + (I - DataPage) * 30, 18, argb(150, 27, 27, 27), align:=StringAlignmentNear, style:=FontStyleBold
+        Page.Writes ESave.GetData(ESave.GetName(I)), GW / 2 + GW * 0.3 - 30, 80 + 30 + (I - DataPage) * 30, 18, argb(150, 27, 27, 27), align:=StringAlignmentFar
     Next
     
     Page.Writes (Int(DataPage / max) + 1) & " / " & (Int(ESave.Count / max) + 1), GW / 2, GH - 120, 16, argb(150, 27, 27, 27), align:=StringAlignmentCenter
@@ -78,56 +114,66 @@ Public Sub SaveManDialog()
 End Sub
 Public Sub LOGODialog()
     If DisableLOGO Then
+        ECore.NewTransform 1, 1000
         DoneMark = True
+        If bitmap <> 0 Then
+            GdipDisposeImage bitmap
+            GdipDeleteBrush LOGO
+        End If
         Exit Sub
     End If
-    
-    Dim w As Long, h As Long
-    w = Page.Res.ImgSize("logo.png", imgGetWidth)
-    h = Page.Res.ImgSize("logo.png", imgGetHeight)
-    If w = 0 Then Exit Sub
-    
-    Page.Clear argb(255, 16, 16, 35)
-    
-    If GetTickCount - OpenTime >= 2000 Then
-        If PreLoadCount <> LoadedCount Then
-            Page.DrawImageEx "logo.png", GW / 2, GH * 0.85 / 2, Int(GW * 0.45), Int((GW * 0.45) / w * h), 1
-        End If
-    Else
-        Page.DrawImageEx "logo.png", GW / 2, GH / 2, Int(GW * 0.45), Int((GW * 0.45) / w * h), 1
-    End If
-    
-    Dim pro As Single
-    
-    If (GetTickCount - OpenTime <= 1000) And (Not HideLOGO) Then
-        pro = Cubic((GetTickCount - OpenTime) / 1000, 0, 0, 0, 1)
-        Page.Paint 0, 0, 0, GW, GH, argb(255 - pro * 255, 16, 16, 35)
-    End If
-    
-    If HideLOGO And PreLoadCount = LoadedCount Then
+    If PreLoadCount = LoadedCount Then
         ECore.NewTransform 1, 1000
         DoneMark = True
     End If
     
-    If GetTickCount - OpenTime >= 2000 Then
-        If PreLoadCount = LoadedCount And ECore.ActivePage <> "" Then
-            ECore.NewTransform 1, 1000
-            DoneMark = True
-        Else
-            If DoneStep = 0 Then
-                DoneStep = 1
-                ECore.NewTransform 0, 1000
-            End If
-            pro = LoadedCount / PreLoadCount
-            If pro > 1 Then pro = 1
-            If LastLoadPro <> pro Then LastLoadPro2 = LastLoadPro: LastLoadPro = pro: ChangeTime = GetTickCount
-            If GetTickCount - ChangeTime <= 500 Then
-                pro = LastLoadPro2 + (pro - LastLoadPro2) * (GetTickCount - ChangeTime) / 500
-            End If
-            Page.Paint 2, GW / 2 - GW * 0.5 / 2, GH * 0.8, GW * 0.5, 14, argb(255, 127, 127, 127), 14
-            Page.Paint 2, GW / 2 - GW * 0.5 / 2, GH * 0.8, GW * 0.5 * pro, 14, argb(255, 255, 255, 255), 14
-        End If
+    Page.Clear argb(255, 255, 255, 255)
+    
+    If LOGO = 0 Then
+        Dim Graphics As Long
+        GdipCreateBitmapFromScan0 GW, GH, ByVal 0, PixelFormat32bppARGB, ByVal 0, bitmap
+        GdipGetImageGraphicsContext bitmap, Graphics
+        GdipDrawImageRect Graphics, Page.Res.ResourceImageHandle(Page.Res.GetImage("logo.png")), GW / 2 - GH * 0.2 / 2, GH * 0.4, GH * 0.2, GH * 0.2
+        GdipCreateTexture bitmap, WrapModeTile, LOGO
     End If
+    
+    Dim Points() As POINTF, path As Long, brush As Long, y As Long
+    Dim pro As Single
+    ReDim Points(1)
+    
+    pro = (LoadedCount / PreLoadCount)
+    
+    GdipCreatePath FillModeWinding, path
+    GdipCreateSolidFill argb(255, 27, 27, 27), brush
+    
+    y = GH / 2
+    
+    Points(0).X = 0: Points(0).y = 0
+    Points(1).X = 0: Points(1).y = y
+    
+    Dim Step As Long
+    Step = Int(GW / 10)
+    
+    For X = 0 To (GW + Step) Step Step
+        ReDim Preserve Points(UBound(Points) + 1)
+        With Points(UBound(Points))
+            .X = X
+            .y = y + Sin(GetTickCount / 200 + X / 10) * (GH * 0.2 / 12)
+        End With
+    Next
+    
+    ReDim Preserve Points(UBound(Points) + 1)
+    Points(UBound(Points) - 1).X = GW: Points(UBound(Points) - 1).y = y
+    Points(UBound(Points)).X = GW: Points(UBound(Points)).y = 0
+    
+    GdipAddPathCurve path, Points(0), UBound(Points) + 1
+    GdipFillPath Page.GG, brush, path
+    GdipFillRectangle Page.GG, LOGO, GW / 2 - GH * 0.2 / 2, GH * 0.4, GH * 0.2, GH * 0.2
+    Page.Writes Int(pro * 100) & "%", GW / 2, GH / 2 + GH * 0.2 / 2 + 20, 20, argb(255, 27, 27, 27), align:=StringAlignmentCenter
+    
+    GdipDeleteBrush brush
+    GdipDeletePath path
+    
 End Sub
 Public Sub SaveDialog()
     Page.Paint 0, 0, 0, 600, 76, argb(255, 242, 242, 242)
@@ -171,6 +217,8 @@ Private Sub Class_Initialize()
     Set Page = New GPage
     Page.Create Me
     Page.Res.NewImages App.path & "\assets\debug"
+    Page.TopPage = True
     
     BDC = CreateCDC(GW, GH)
 End Sub
+
